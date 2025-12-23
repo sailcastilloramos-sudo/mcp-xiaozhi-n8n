@@ -37,8 +37,8 @@ def ejecutar_accion_n8n(accion: str, objetivo: str = "", valor: str = "") -> str
     except Exception as e:
         return f"❌ Error al contactar a n8n: {str(e)}"
 
-# 4. INICIAR EL SERVIDOR (Se conectará automáticamente al endpoint de Xiaozhi)
+# 4. INICIAR EL SERVIDOR - FORMA CORRECTA
 if __name__ == "__main__":
-    # El servidor leerá automáticamente la variable de entorno
-    # 'XIAOZHI_MCP_TOKEN' para autenticarse
-    mcp.run(transport="websocket")
+    # El servidor se conectará como cliente al endpoint de Xiaozhi AI
+    # Asegúrate de tener la variable de entorno 'XIAOZHI_MCP_TOKEN' configurada
+    mcp.run_as_client()
