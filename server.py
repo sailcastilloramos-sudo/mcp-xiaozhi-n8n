@@ -1,52 +1,37 @@
-import asyncio
-from fastmcp import FastMCP
+import os
 import httpx
+from fastmcp import FastMCP
 
-# 1. INICIALIZAR EL SERVIDOR FASTMCP
-# El nombre debe coincidir con el que configuraste en Xiaozhi
+# 1. INICIALIZAR EL SERVIDOR
 mcp = FastMCP("mi-servidor-n8n")
 
-# 2. DECLARAR TU HERRAMIENTA (Se llamará 'ejecutar_accion_n8n')
+# 2. DEFINIR LA HERRAMIENTA PARA N8N
 @mcp.tool()
 def ejecutar_accion_n8n(accion: str, objetivo: str = "", valor: str = "") -> str:
     """
-    Ejecuta una acción o automatización en el sistema n8n.
-    Puede controlar luces, tareas, datos, etc.
-
-    Args:
-        accion: Nombre de la acción (ej: 'encender_luces', 'crear_tarea').
-        objetivo: Objetivo de la acción (ej: 'salon', 'comprar leche').
-        valor: Valor opcional (ej: '22', 'alta').
+    Ejecuta una acción en el sistema n8n. Ej: encender_luces, crear_tarea.
     """
-    # 3. LOGICA PARA LLAMAR A TU WEBHOOK DE N8N
-    # IMPORTANTE: Reemplaza esta URL por la tuya
-    webhook_url = "https://ser2n8n.grupohsm.net/webhook/xiaozhi-action"
+    # URL de tu webhook - Asegúrate de que sea correcta
+    webhook_url = os.getenv("N8N_WEBHOOK_URL", "https://ser2n8n.grupohsm.net/webhook/xiaozhi-action")
     
     payload = {
         "comando": accion,
         "objetivo": objetivo,
         "valor": valor,
-        "origen": "xiaozhi_ai_mcp_python"
+        "origen": "xiaozhi_ai_mcp"
     }
     
     try:
-        # Hacer la petición HTTP a n8n
         response = httpx.post(webhook_url, json=payload, timeout=10.0)
-        response.raise_for_status()  # Lanza error si HTTP no es 2xx
-        return f"✅ Acción '{accion}' enviada a n8n. Respuesta: {response.text}"
+        response.raise_for_status()
+        return f"✅ Acción '{accion}' completada. Respuesta: {response.text[:100]}"
+    except httpx.RequestError as e:
+        return f"❌ Error de conexión: {str(e)}"
     except Exception as e:
-        return f"❌ Error al contactar a n8n: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
-# 4. INICIAR EL SERVIDOR - VERSIÓN MÁS COMÚN
+# 3. INICIAR EL SERVIDOR EN MODO STDIO
 if __name__ == "__main__":
-    import os
-    token = os.getenv("XIAOZHI_MCP_TOKEN")
-    if not token:
-        raise ValueError("❌ Falta la variable de entorno XIAOZHI_MCP_TOKEN")
-    
-    # Construye la URL de conexión completa
-    endpoint_url = f"wss://api.xiaozhi.me/mcp/?token={token}"
-    print(f"🔗 Conectando a: {endpoint_url[:60]}...")
-    
-    # Intenta conectar usando el método 'run' con la URL
-    mcp.run(server_url=endpoint_url)  # También prueba con 'url=' en lugar de 'server_url='
+    # Este método permite que Xiaozhi AI se comunique con tu script
+    print("🚀 Iniciando servidor MCP para Xiaozhi AI...")
+    mcp.run()
