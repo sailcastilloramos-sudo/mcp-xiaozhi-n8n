@@ -3,161 +3,170 @@ import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/webso
 import fetch from 'node-fetch';
 
 // ============================================
-// CONFIGURACIÓN (SE OBTIENE DE VARIABLES DE ENTORNO)
+// CONFIGURACIÓN (VARIABLES DE ENTORNO)
 // ============================================
-// ESTAS VARIABLES DEBES CONFIGURARLAS EN EL PANEL DE EASYPANEL
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL; // URL de tu webhook de n8n
-const XIAOZHI_MCP_TOKEN = process.env.XIAOZHI_MCP_TOKEN; // Token de tu endpoint MCP
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const XIAOZHI_MCP_TOKEN = process.env.XIAOZHI_MCP_TOKEN;
 const XIAOZHI_MCP_ENDPOINT = process.env.XIAOZHI_MCP_ENDPOINT || 'wss://api.xiaozhi.me/mcp/';
 
-// Validación crítica de configuración al inicio
+// Validación de configuración
 if (!N8N_WEBHOOK_URL || !XIAOZHI_MCP_TOKEN) {
-    console.error('❌ ERROR DE CONFIGURACIÓN: Faltan variables de entorno obligatorias.');
-    console.error('   Asegúrate de configurar N8N_WEBHOOK_URL y XIAOZHI_MCP_TOKEN en Easypanel.');
-    process.exit(1); // Detiene la ejecución si falta algo esencial
+    console.error('❌ ERROR: Faltan variables N8N_WEBHOOK_URL o XIAOZHI_MCP_TOKEN');
+    process.exit(1);
 }
 
-console.log('⚙️  Configuración cargada. Iniciando servidor MCP...');
+console.log('⚙️ Configuración cargada. Iniciando servidor MCP...');
 console.log('🔗 Destino n8n:', N8N_WEBHOOK_URL);
 
 // ============================================
-// 1. CREAR EL SERVIDOR MCP
+// 1. CREAR SERVIDOR MCP (FORMA CORREGIDA)
 // ============================================
 const server = new Server(
-    { name: 'n8n-mcp-bridge', version: '1.0.0' },
-    { capabilities: {} }
+    {
+        name: 'n8n-mcp-bridge',
+        version: '1.0.0'
+    },
+    {
+        capabilities: {
+            tools: {}
+        }
+    }
 );
 
 // ============================================
-// 2. DECLARAR LAS HERRAMIENTAS DISPONIBLES
+// 2. DECLARAR HERRAMIENTAS DISPONIBLES
 // ============================================
 server.setRequestHandler('tools/list', async () => {
+    console.log('📋 Solicitada lista de herramientas');
     return {
         tools: [
             {
                 name: 'ejecutar_accion_n8n',
-                description: 'Ejecuta una acción o automatización en el sistema n8n. Puede controlar luces, tareas, datos, etc.',
+                description: 'Ejecuta una acción o automatización en el sistema n8n',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         accion: {
                             type: 'string',
-                            description: 'Nombre de la acción a realizar. Ej: "encender_luces", "crear_tarea", "consultar_estado"'
+                            description: 'Nombre de la acción: "encender_luces", "crear_tarea", etc.'
                         },
                         objetivo: {
                             type: 'string',
-                            description: 'Objetivo de la acción. Ej: "salon", "comprar leche", "temperatura"'
+                            description: 'Objetivo: "salon", "comprar leche", etc.'
                         },
                         valor: {
-                            type: 'string',
-                            description: 'Valor opcional. Ej: "22", "alta", "mañana"'
+                            type: 'string', 
+                            description: 'Valor opcional: "22", "alta", etc.'
                         }
                     },
-                    required: ['accion'] // Solo la acción es obligatoria
+                    required: ['accion']
                 }
             }
-            // Puedes añadir más herramientas aquí en el futuro
         ]
     };
 });
 
 // ============================================
-// 3. IMPLEMENTAR LA LÓGICA DE LAS HERRAMIENTAS
+// 3. MANEJAR LLAMADAS A HERRAMIENTAS
 // ============================================
 server.setRequestHandler('tools/call', async (request) => {
-    const { name, arguments: args } = request.params;
+    try {
+        const { name, arguments: args } = request.params;
+        console.log(`📨 Llamada a herramienta: ${name}`, args);
 
-    if (name === 'ejecutar_accion_n8n') {
-        const { accion, objetivo, valor } = args;
-
-        console.log(`📨 Llamada a herramienta: ${accion} (Objetivo: ${objetivo}, Valor: ${valor})`);
-
-        try {
-            // Construir el payload para n8n
+        if (name === 'ejecutar_accion_n8n') {
+            const { accion, objetivo, valor } = args;
+            
+            // CORRIGE LA URL DEL WEBHOOK (agrega la "s" en hsm)
+            const webhookUrl = N8N_WEBHOOK_URL.replace('grupoham.net', 'grupohsm.net');
+            
             const payload = {
                 comando: accion,
                 objetivo: objetivo || '',
                 valor: valor || '',
                 timestamp: new Date().toISOString(),
-                origen: 'xiaozhi_ai_via_mcp'
+                origen: 'xiaozhi_ai_mcp'
             };
 
-            // Llamar al webhook de n8n con un timeout
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10 segundos
-
-            const response = await fetch(N8N_WEBHOOK_URL, {
+            console.log(`🔄 Enviando a n8n: ${webhookUrl}`);
+            
+            const response = await fetch(webhookUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Xiaozhi-MCP-Server/1.0'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
-                signal: controller.signal
+                timeout: 10000
             });
 
-            clearTimeout(timeout);
-
-            const resultadoTexto = await response.text();
-            console.log(`✅ n8n respondió (${response.status}): ${resultadoTexto.substring(0, 200)}...`);
+            const result = await response.text();
+            console.log(`✅ n8n respondió (${response.status}): ${result.substring(0, 100)}`);
 
             return {
                 content: [{
                     type: 'text',
-                    text: `Comando "${accion}" ejecutado en n8n. Respuesta del sistema: ${resultadoTexto}`
+                    text: `Acción "${accion}" completada. Respuesta: ${result}`
                 }]
             };
-
-        } catch (error) {
-            console.error('❌ Error al llamar a n8n:', error.message);
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Error al ejecutar la acción "${accion}" en n8n: ${error.message}`
-                }],
-                isError: true
-            };
         }
-    }
 
-    throw new Error(`Herramienta no encontrada: ${name}`);
+        throw new Error(`Herramienta desconocida: ${name}`);
+    } catch (error) {
+        console.error('❌ Error en tools/call:', error);
+        return {
+            content: [{
+                type: 'text',
+                text: `Error: ${error.message}`
+            }],
+            isError: true
+        };
+    }
 });
 
 // ============================================
-// 4. CONECTAR CON EL ENDPOINT MCP DE XIAOZHI AI
+// 4. CONECTAR CON XIAOZHI AI
 // ============================================
 async function connectToXiaozhi() {
     try {
-        console.log('🔄 Conectando al endpoint MCP de Xiaozhi AI...');
+        console.log('🔄 Conectando a Xiaozhi AI MCP...');
         
-        const url = new URL(`${XIAOZHI_MCP_ENDPOINT}?token=${XIAOZHI_MCP_TOKEN}`);
+        // Asegurar que el token no tenga la URL completa
+        let token = XIAOZHI_MCP_TOKEN;
+        if (token.includes('wss://')) {
+            // Extraer solo el token si se incluyó la URL completa
+            const urlObj = new URL(token);
+            token = urlObj.searchParams.get('token') || token;
+        }
+        
+        const url = new URL(`${XIAOZHI_MCP_ENDPOINT}?token=${token}`);
         const transport = new WebSocketClientTransport(url);
         
         await server.connect(transport);
-        console.log('✅ Conexión MCP establecida con Xiaozhi AI.');
-        console.log('🎯 El asistente puede ahora usar la herramienta "ejecutar_accion_n8n".');
-
+        console.log('✅ Conexión MCP establecida con Xiaozhi AI');
+        console.log('🚀 Servidor listo. Herramienta "ejecutar_accion_n8n" disponible.');
+        
     } catch (error) {
-        console.error('❌ Error fatal de conexión a Xiaozhi:', error.message);
-        console.error('   Verifica: 1) El token MCP es correcto, 2) La red permite WebSockets, 3) El endpoint está activo.');
-        process.exit(1); // Sale si no puede conectarse
+        console.error('❌ Error de conexión:', error.message);
+        console.error('Detalles:', error);
+        process.exit(1);
     }
 }
 
 // ============================================
-// 5. MANEJO DE SEÑALES PARA UN CIERRE LIMPIO
+// 5. MANEJAR CIERRE
 // ============================================
 process.on('SIGTERM', () => {
-    console.log('🛑 Señal SIGTERM recibida. Cerrando servidor...');
+    console.log('🛑 Apagando servidor...');
     process.exit(0);
 });
 
 process.on('SIGINT', () => {
-    console.log('🛑 Señal SIGINT (Ctrl+C) recibida. Cerrando servidor...');
+    console.log('🛑 Interrupción por usuario');
     process.exit(0);
 });
 
 // ============================================
-// INICIAR TODO
+// INICIAR
 // ============================================
-connectToXiaozhi().catch(console.error);
+connectToXiaozhi().catch(error => {
+    console.error('❌ Error fatal:', error);
+    process.exit(1);
+});
