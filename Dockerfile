@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Instala las dependencias de producción de forma limpia y precisa
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copia el resto del código de la aplicación
 COPY . .
@@ -17,4 +17,5 @@ COPY . .
 EXPOSE 3000
 
 # Define el comando para ejecutar la aplicación
+
 CMD [ "node", "server.js" ]
