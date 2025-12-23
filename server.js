@@ -3,13 +3,12 @@ import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/webso
 import fetch from 'node-fetch';
 
 // ============================================
-// CONFIGURACIÓN (VARIABLES DE ENTORNO)
+// CONFIGURACIÓN
 // ============================================
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const XIAOZHI_MCP_TOKEN = process.env.XIAOZHI_MCP_TOKEN;
 const XIAOZHI_MCP_ENDPOINT = process.env.XIAOZHI_MCP_ENDPOINT || 'wss://api.xiaozhi.me/mcp/';
 
-// Validación de configuración
 if (!N8N_WEBHOOK_URL || !XIAOZHI_MCP_TOKEN) {
     console.error('❌ ERROR: Faltan variables N8N_WEBHOOK_URL o XIAOZHI_MCP_TOKEN');
     process.exit(1);
@@ -19,7 +18,7 @@ console.log('⚙️ Configuración cargada. Iniciando servidor MCP...');
 console.log('🔗 Destino n8n:', N8N_WEBHOOK_URL);
 
 // ============================================
-// 1. CREAR SERVIDOR MCP (FORMA CORREGIDA)
+// 1. CREAR SERVIDOR MCP (CONFIGURACIÓN COMPATIBLE)
 // ============================================
 const server = new Server(
     {
@@ -34,7 +33,7 @@ const server = new Server(
 );
 
 // ============================================
-// 2. DECLARAR HERRAMIENTAS DISPONIBLES
+// 2. MANEJADOR DE LISTA DE HERRAMIENTAS
 // ============================================
 server.setRequestHandler('tools/list', async () => {
     console.log('📋 Solicitada lista de herramientas');
@@ -67,7 +66,7 @@ server.setRequestHandler('tools/list', async () => {
 });
 
 // ============================================
-// 3. MANEJAR LLAMADAS A HERRAMIENTAS
+// 3. MANEJADOR DE LLAMADAS A HERRAMIENTAS
 // ============================================
 server.setRequestHandler('tools/call', async (request) => {
     try {
@@ -77,9 +76,6 @@ server.setRequestHandler('tools/call', async (request) => {
         if (name === 'ejecutar_accion_n8n') {
             const { accion, objetivo, valor } = args;
             
-            // CORRIGE LA URL DEL WEBHOOK (agrega la "s" en hsm)
-            const webhookUrl = N8N_WEBHOOK_URL.replace('grupoham.net', 'grupohsm.net');
-            
             const payload = {
                 comando: accion,
                 objetivo: objetivo || '',
@@ -88,9 +84,9 @@ server.setRequestHandler('tools/call', async (request) => {
                 origen: 'xiaozhi_ai_mcp'
             };
 
-            console.log(`🔄 Enviando a n8n: ${webhookUrl}`);
+            console.log(`🔄 Enviando a n8n: ${N8N_WEBHOOK_URL}`);
             
-            const response = await fetch(webhookUrl, {
+            const response = await fetch(N8N_WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -122,16 +118,15 @@ server.setRequestHandler('tools/call', async (request) => {
 });
 
 // ============================================
-// 4. CONECTAR CON XIAOZHI AI
+// 4. CONEXIÓN CON XIAOZHI AI
 // ============================================
 async function connectToXiaozhi() {
     try {
         console.log('🔄 Conectando a Xiaozhi AI MCP...');
         
-        // Asegurar que el token no tenga la URL completa
         let token = XIAOZHI_MCP_TOKEN;
+        // Limpiar token si incluye la URL completa
         if (token.includes('wss://')) {
-            // Extraer solo el token si se incluyó la URL completa
             const urlObj = new URL(token);
             token = urlObj.searchParams.get('token') || token;
         }
@@ -145,13 +140,12 @@ async function connectToXiaozhi() {
         
     } catch (error) {
         console.error('❌ Error de conexión:', error.message);
-        console.error('Detalles:', error);
         process.exit(1);
     }
 }
 
 // ============================================
-// 5. MANEJAR CIERRE
+// 5. MANEJO DE SEÑALES
 // ============================================
 process.on('SIGTERM', () => {
     console.log('🛑 Apagando servidor...');
