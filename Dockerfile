@@ -1,21 +1,17 @@
-# Usa una imagen oficial de Node.js ligera
-FROM node:18-alpine
+# Usa una imagen ligera de Python
+FROM python:3.11-slim
 
-# Crea y define el directorio de trabajo dentro del contenedor
-WORKDIR /usr/src/app
+# Establece el directorio de trabajo
+WORKDIR /app
 
-# Copia los archivos de definición de dependencias
-COPY package*.json ./
+# Copia el archivo de dependencias
+COPY requirements.txt .
 
-# Instala las dependencias de producción de forma limpia y precisa
-RUN npm install --only=production
+# Instala las dependencias
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia el resto del código de la aplicación
-COPY . .
+# Copia el código de la aplicación
+COPY server.py .
 
-# Expone el puerto (por convención, aunque el MCP usa WebSocket)
-EXPOSE 3000
-
-# Define el comando para ejecutar la aplicación
-
-CMD [ "node", "server.js" ]
+# El comando para ejecutar la aplicación
+CMD ["python", "server.py"]
