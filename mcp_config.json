@@ -1,10 +1,9 @@
 {
-  "servers": [
-    {
-      "name": "n8n-webhook-bridge",
+  "mcpServers": {
+    "n8n-webhook-bridge": {
       "command": "python",
       "args": ["n8n_webhook.py"],
       "disabled": false
     }
-  ]
+  }
 }
