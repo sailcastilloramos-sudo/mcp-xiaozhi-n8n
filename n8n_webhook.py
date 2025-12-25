@@ -2,7 +2,7 @@
 import httpx
 import asyncio
 from typing import Any, Dict
-from mcp import FastMCP
+from mcp.server import FastMCP
 
 # Inicializa el cliente MCP
 mcp = FastMCP("N8N-Webhook-Bridge")
