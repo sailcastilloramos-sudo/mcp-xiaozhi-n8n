@@ -19,7 +19,7 @@ async def trigger_n8n_workflow(action_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict con la respuesta de N8N o un mensaje de error.
     """
-    n8n_webhook_url = "https://ser2n8n.grupohsm.net/webhook/xiaozhi-action"
+    n8n_webhook_url = "https://ser2n8n...."
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
